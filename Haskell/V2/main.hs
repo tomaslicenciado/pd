@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiWayIf #-}
 import Interacciones
     ( puntosEnvidoMano, repartir, Canto(..), mejorCarta, cola )
-import Mazo ( carta, Carta, Palo(..), nada )
+import Mazo ( carta, Carta, Palo(..), nada, mazo )
 import Data.List ( sort )
 import Data.Bifunctor (first)
 
@@ -14,9 +14,16 @@ jugada opcion j1 j2 cantos jugadas puntos
 
 opciones :: [Carta] -> [Canto] -> String
 opciones cartas cantos
-    | length cartas + length cantos == 0 = ""
-    | not (null cartas) = ""
-    | otherwise = ""
+    | length cartas + length cantos == 0 = "1"
+    | not (null cartas) = "2"
+    | otherwise = "3"
+
+main :: IO()
+main = do
+    let m1 = mazo
+        s = opciones m1 []
+    putStrLn s
+    if s == "1" then main else putStrLn "Chau"
 
 
 

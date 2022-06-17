@@ -31,6 +31,10 @@ cantaReTruco = "QUIERO RETRUCO"
 cantaVale4 :: String
 cantaVale4 = "QUIERO VALE 4"
 
+respuestasEnvido :: [String]
+respuestasEnvido = ["QUIERO", cantaEnvidoEnvido, cantaRealEnvido, cantaLaFalta, "NO SE QUIERE"]
+--respuestasEnvido = ["QUIERO", "ENVIDO ENVIDO", "REAL ENVIDO", "FALTA ENVIDO", "NO SE QUIERE"]
+
 envido :: String -> [Carta] -> String
 envido msj cartas
     | msj == cantaEnvido = if
@@ -78,3 +82,6 @@ ganaJugador (x,nada) = False
 ganaJugador (nada, y) = y == macho
 ganaJugador (x,y) = y == ganaCarta x y
 
+posibleRespuestaEnvido :: String -> [String]
+posibleRespuestaEnvido "" = []
+posibleRespuestaEnvido s = (head respuestasEnvido) : drop (head $ elemIndices s respuestasEnvido) (tail respuestasEnvido)
