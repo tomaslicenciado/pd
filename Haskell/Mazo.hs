@@ -18,7 +18,7 @@ module Mazo
     valorPEnvido
 ) where
 
-import Data.List( elemIndex, sort )
+import Data.List( elemIndex )
 
 -- Definimos los palos
 data Palo = Oros | Espadas | Basto | Copas | Cualquier deriving ( Show )
@@ -59,7 +59,7 @@ instance Ord Carta where
 -- Cuando una carta es igual a otra 
 instance Eq Carta where
     (==) c1 c2 
-        | numero c1 == numero c2 = palo c1 == palo c2
+        | numero c1 == numero c2 = paloIgual c1 c2
         | otherwise = False
 -------------------------------------------------------------------------------------------------------------
 
@@ -70,6 +70,7 @@ instance Show Carta where
         | c == hembra = "Hembra"
         | c == anchoCopa = "Ancho de Copas"
         | c == anchoOro = "Ancho de Oros"
+        | c == nada = ""
         | numero c == as = "As de " ++ show (palo c)
         | numero c == sota = "Sota de " ++ show (palo c)
         | numero c == caballo = "Caballo de " ++ show (palo c)
@@ -94,7 +95,7 @@ anchoCopa = C as Copas
 -- Definimos el orden específico de importancia para las cartas en el truco, ésto facilita la comparación
 orden :: [Carta]
 orden = [macho, hembra, C 7 Espadas, C 7 Oros, C 3 Cualquier , C 2 Cualquier , C 1 Cualquier ,
-        C rey Cualquier, C caballo Cualquier, C 7 Cualquier, C 6 Cualquier, C 5 Cualquier, C 4 Cualquier]
+        C rey Cualquier, C caballo Cualquier, C 7 Cualquier, C 6 Cualquier, C 5 Cualquier, C 4 Cualquier, nada]
 
 nada :: Carta
 nada = C 0 Cualquier

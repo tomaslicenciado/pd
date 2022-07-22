@@ -7,10 +7,10 @@ module Interacciones
     puntosEnvidoMano,
     ganaCarta,
     cola,
-    mejorCarta
+    opciones
 )where
 
-import Mazo ( carta, mazo, nada, orden, valorPEnvido, Carta(palo), Palo(..))
+import Mazo ( carta, mazo, nada, orden, valorPEnvido, Carta(palo), Palo(..), paloIgual)
 import Data.List (sortBy, elemIndex, sort, transpose)
 import Data.Time.Clock ( UTCTime(utctDayTime), getCurrentTime, DiffTime )
 import Data.Functor ( (<&>) )
@@ -35,17 +35,16 @@ instance Show Canto where
         | c == QUIERO = "Quiero"
         | c == NOQUIERO = "No quiero"
         | otherwise = " "
------------------------------------------------------------------------------------------------------------------------
 
--- Definir si dos cartas son del mismo palo
-mismoPalo :: Carta -> Carta -> Bool
-mismoPalo c1 c2 = palo c1 == palo c2
+respuestasEnvido :: [String]
+respuestasEnvido = map show [ENVIDO, ENVIDOENVIDO, REALENVIDO, FALTAENVIDO, QUIERO, NOQUIERO]
+-----------------------------------------------------------------------------------------------------------------------
 
 -- Agrupar un conjunto de cartas por palo
 agruparPorPalo :: [Carta] -> [[Carta]]
 agruparPorPalo [] = []
 agruparPorPalo [x] = [[x]]
-agruparPorPalo xs = (head xs : takeWhile (mismoPalo (head xs)) (tail xs)) : agruparPorPalo (dropWhile (mismoPalo (head xs)) (tail xs))
+agruparPorPalo xs = filter (paloIgual (head xs)) xs : agruparPorPalo (filter (not . paloIgual (head xs)) xs)
 
 ----------------------------------------------------------------------------------
 -- Calcular puntos para el envido en la mano
@@ -54,6 +53,7 @@ agruparPorPalo xs = (head xs : takeWhile (mismoPalo (head xs)) (tail xs)) : agru
 sumaPuntosEnvido :: [Carta] -> Int
 sumaPuntosEnvido [] = 0
 sumaPuntosEnvido xs
+    | length xs == 1 = (valorPEnvido . head) xs
     | length xs >= 3 = sumaPuntosEnvido (filter ((minimum  (map valorPEnvido xs) <). valorPEnvido) xs)
     | otherwise = sum (map valorPEnvido xs) + 20
 
@@ -66,8 +66,8 @@ puntosEnvidoMano xs = maximum $ map sumaPuntosEnvido (agruparPorPalo xs)
 -- Que carta gana en una mano de truco. Nada significa tablas o empate
 ganaCarta :: Carta -> Carta -> Carta
 ganaCarta c1 c2
-    | elemIndex c1 orden > elemIndex c2 orden = c2
-    | elemIndex c1 orden < elemIndex c2 orden = c1
+    | c2 > c1 = c2
+    | c1 > c2 = c1
     | otherwise = nada
 
 -----------------------------------------------------------------------------------
@@ -109,21 +109,36 @@ repartir = do
         c = transpose $ [take 2 m] ++ [(take 2 . drop 2) m] ++ [(take 2 . drop 4) m]
     (head c, last c)
 
--- Dicernir la mejor carta a jugar de las disponibles
-mejorCarta :: [Carta] -> ([Carta],[Carta]) -> Carta
-mejorCarta [] _ = nada
-mejorCarta cts (js1,js2)
-    | length js1 + length js2 == 0 = if minimum cts == maximum cts then minimum cts else (minimum . init . sort) js1
-    | length js1 + length js2 == 1 = if
-        | ganaCarta ((head . tail . sort) cts) (head js2) `elem` cts -> (head . tail . sort) cts
-        | (ganaCarta (maximum cts) (head js2) `elem` cts) && (maximum cts >= carta 3 Cualquier) -> if
-            ganaCarta ((head . tail . sort) cts) (head js2) == nada then (head . tail . sort) cts
-            else maximum cts
-        | otherwise -> minimum cts
-    | length js1 + length js2 < 4 = if ganaCarta (head js1) (head js2) `elem` js1
-        then minimum cts
-        else if ganaCarta (maximum cts) (head js2) `elem` cts
-            then maximum cts
-            else nada
-    | length js1 + length js2 < 6 = if ganaCarta (head cts) (head js2) `elem` cts then head cts else nada
-    | otherwise = nada
+-- Definimos que opciones imprimirle al usuario en base a los cantos de envido, los cantos de truco
+-- y las cartas jugadas y disponibles
+-- Recibe: CantosEnvido -> CantosTruco -> Jugadas -> CartasDisponibles
+-- Devuelve: Lista de opciones
+opciones :: [(Carta,Carta)] -> [Carta] -> [String] -> [String] -> [String]
+opciones csJugadas csDisp csEnvido csTruco = do
+        let opc = opcionesEnvido csEnvido csTruco csJugadas ++ opcionesTruco csEnvido csTruco ++ opcionesCartas csEnvido csTruco csDisp ++ ["Salir"]
+        zipWith (++) [(++ " - ") (show x) | x <- iterate (+ 1) 1] opc
+
+-- Generamos las opciones de canto de envido disponibles en base a los cantos previos de envido
+-- verificando que no se haya jugado ya el envido, que no se esté cantando truco (salvo por el primer canto)
+-- y verificando que no se haya jugado ya la primera mano de cartas
+opcionesEnvido :: [String] -> [String] -> [(Carta,Carta)] -> [String]
+opcionesEnvido csEnvido csTruco csJugadas
+    | "JUGADO" `elem` csEnvido = []
+    | null csEnvido && (null csTruco || length csTruco == 1) && (null csJugadas || (fst (head csJugadas) == nada)) = map show [ENVIDO, REALENVIDO, FALTAENVIDO]
+    | not (null csEnvido) = tail $ dropWhile (/= last csEnvido) respuestasEnvido
+    | otherwise = []
+
+-- Generamos las opciones de canto de truco controlando que no se esté en medio de un canto de envido
+opcionesTruco :: [String] -> [String] -> [String]
+opcionesTruco csEnvido csTruco
+    | (not (null csEnvido) && "JUGADO" `notElem` csEnvido)  || ("CANTADO" `elem` csTruco) = []
+    | null csTruco = [show TRUCO]
+    | otherwise =  take 1 (reverse(takeWhile (/= last csTruco) (reverse (map show [TRUCO, RETRUCO, VALECUATRO])))) ++ map show [QUIERO, NOQUIERO]
+
+-- Generamos las ociones de cartas a jugar cuando es posible realizar una jugada
+opcionesCartas :: [String] -> [String] -> [Carta] -> [String]
+opcionesCartas csEnvido csTruco csDisp
+    | not (null csEnvido) && "JUGADO" `notElem` csEnvido = []
+    | not (null csTruco) && "CANTADO" `notElem` csTruco = []
+    | otherwise = map (("Jugar "++).show) csDisp ++ ["Retirarse"]
+
